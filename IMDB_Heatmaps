@@ -1,0 +1,51 @@
+import pandas as pd
+import seaborn as sns
+import sys
+import matplotlib.pyplot as plt
+import requests
+from bs4 import BeautifulSoup
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
+color = 'viridis'         #Color scheme for heatmaps
+ser_code = "tt0077003"    #Series code from IMDB's website
+
+
+bb = "http://www.imdb.com/title/" + ser_code + "/epdate"
+site = requests.get(bb)
+soup = BeautifulSoup(site.content, 'html.parser')
+name = soup.title.string.split('"')[1]
+
+df = pd.read_html(bb,
+                  encoding='utf-8',
+                  header=0,
+                  converters={'#': str, 'Episode': str, 'UserRating': float, 'UserVotes':int})
+df = df[0][['#', 'Episode', 'UserRating', 'UserVotes']]
+
+df['season'] = df['#'].apply(lambda x: x.split(".")[0] if len(x) > 1 else False).astype(int)
+df['ep_num'] = df['#'].apply(lambda x: x.split(".")[1] if len(x) > 1 else False).astype(int)
+
+uv = "{:,d}".format(int(df['UserVotes'].sum()))
+mini = str(df['UserRating'].min())
+maxi = str(df['UserRating'].max())
+avg = str(format(df['UserRating'].mean(), '.2f'))
+semi_final = name+ "\nBased on a total of "+ str(uv)+ " Voters"+ "\nLowest grade - "+ mini+ "\nHighest grade - "+ maxi+ "\nAvg. Grade "+avg
+
+final_name = str(semi_final)
+
+# sns.distplot(a= df['UserRating'])
+
+# sns.violinplot(x='UserRating', y='season', data=df, split=True, orient="h", palette='Set2', inner="quartile")
+piv = df.pivot_table(values='UserRating', index='ep_num', columns='season')
+
+f, ax = plt.subplots()
+ax = sns.heatmap(piv, annot=True, cmap=color, robust=True,linecolor="white", linewidths=0.1, cbar_kws={'label':"IMDB's Users' Rating"})
+
+ax.invert_yaxis()
+plt.yticks(rotation=0)
+plt.title(final_name)
+plt.xlabel("Season Number")
+plt.ylabel("Episode Number")
+plt.tight_layout()
+plt.show()
